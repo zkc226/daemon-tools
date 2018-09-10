@@ -1,0 +1,19 @@
+{
+    "name": "zkc/daemon-tools",
+    "version": "0.0.1",
+    "description": "A php daemon tools",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Z.kc",
+            "email": "zkc226@163.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "zkc\\": "src/"
+        }
+    }
+}
