@@ -9,12 +9,13 @@ namespace zkc\DaemonTools;
 class SignalHandler
 {
 
-    static $isDeclare = false;
+    static $isDeclare = [];
 
     public static function addHandler($signo, $callback)
     {
-        if (!self::$isDeclare) {
-            self::$isDeclare = true;
+        $pid = getmypid();
+        if (!isset(self::$isDeclare[$pid]) || self::$isDeclare[$pid] == false) {
+            self::$isDeclare[$pid] = true;
             //信号处理需要注册ticks才能生效，这里务必注意
             //PHP5.4以上版本就不再依赖ticks了
             declare(ticks=1);
@@ -31,7 +32,7 @@ class SignalHandler
             SIGUSR1,
             SIGHUP,
             SIGQUIT,
-            // SIGINT mac 下导致 segmentation fault
+            SIGINT, //mac 下导致 segmentation fault
             SIGINT,
             //SIGKILL,
             SIGTERM,

@@ -14,14 +14,19 @@ class Daemon
     private $childrenPid;
     private $supportPcntl = false;
 
-    public function __construct()
+    public function __construct($name = '')
     {
         $this->supportPcntl = extension_loaded('pcntl');
 
-        // if(! $this->supportPcntl) {
-        // 	echo 'need pcntl extension' . PHP_EOL;
-        // 	exit;
-        // }
+        if (!$this->supportPcntl) {
+            echo 'need pcntl extension' . PHP_EOL;
+            exit;
+        }
+        SignalHandler::addExitHanlder([$this, 'stop']);
+
+        if (!empty($name)) {
+            @cli_set_process_title($name);
+        }
 
         $this->parentPid = getmypid();
     }
@@ -39,11 +44,11 @@ class Daemon
     /**
      * fork 子进程
      *
-     * @param  callback $childCallback 回调方法
+     * @param Process $process
      *
      * @return int                     -1: 失败, >0 子进程编号
      */
-    public function fork($childCallback)
+    public function fork(Process $process)
     {
         if ($this->supportPcntl) {
             $pid = pcntl_fork();
@@ -55,12 +60,22 @@ class Daemon
             // fork fail
 
         } elseif ($pid == 0) {
+            declare(ticks=1);
+
             // echo $pid . PHP_EOL;
             // child process
-            $childPid = getmypid();
+            $childPid      = posix_getpid();
+            $process->pid  = $childPid;
+            $process->ppid = posix_getppid();
 
-            $childCallback($childPid);
-            exit;
+            if (!empty($process->name)) {
+                @cli_set_process_title($process->name);
+            }
+
+            $process->installSignal();
+            $process->run();
+
+            exit(0);
         } else {
             $this->childrenPid[$pid] = time();
         }
@@ -68,65 +83,38 @@ class Daemon
         return $pid;
     }
 
-    public function clean()
+    public function stop()
     {
+        // echo "exit\n";
         if (!empty($this->childrenPid)) {
             foreach ($this->childrenPid as $cpid => $cval) {
-                $status = 0;
-                $tpid   = pcntl_waitpid($cpid, $status, WNOHANG);
-                if ($tpid > 0) {
-                    unset($this->childrenPid[$tpid]);
-                }
+                posix_kill($cpid, SIGINT);
             }
         }
     }
 
-    public function wait($num = 0)
+    public function wait()
     {
         if (!$this->supportPcntl) {
             return true;
         }
-        // wait
-        // while(true && count($this->childrenPid) > 0) {
-        // 	if(count($this->childrenPid) <= $num) {
-        // 		break;
-        // 	}
-        // 	$status = 0;
-        // 	$tpid = pcntl_wait($status, WNOHANG);
-        // 	if($tpid>0) {
-        // 		unset($this->childrenPid[$tpid]);
-        // 		// echo $tpid, ':', $status . PHP_EOL;
-        // 		$remain = count($this->childrenPid);
-        // 		if($remain <= $num) {
-        // 			// echo 'children process num:' .$remain. PHP_EOL;
+        $num = 0;
 
-        // 			break;
-        // 		}
-        // 	} else {
-        // 		// sleep(1);
-        // 		usleep(50000);
-        // 	}
-        // }
+        pcntl_signal_dispatch();
+
         while (true && count($this->childrenPid) > 0) {
             if (count($this->childrenPid) <= $num) {
                 break;
             }
 
             foreach ($this->childrenPid as $cpid => $cval) {
-
                 $status = 0;
-                $tpid   = pcntl_waitpid($cpid, $status, WNOHANG);
-                if ($tpid > 0) {
-                    unset($this->childrenPid[$tpid]);
-                    // echo $tpid, ':', $status . PHP_EOL;
-                    $remain = count($this->childrenPid);
-                    if ($remain <= $num) {
-                        // echo 'children process num:' .$remain. PHP_EOL;
+                pcntl_waitpid($cpid, $status, WNOHANG);
+            }
 
-                        break;
-                    }
-                } else {
-                    // sleep(1);
+            foreach ($this->childrenPid as $cpid => $cval) {
+                if (!posix_kill($cpid, 0)) {
+                    unset($this->childrenPid [$cpid]);
                 }
             }
 
@@ -134,7 +122,7 @@ class Daemon
                 break;
             }
 
-            usleep(50000);
+            usleep(500000);
         }
     }
 

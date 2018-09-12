@@ -1,6 +1,6 @@
 {
     "name": "zkc/daemon-tools",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "A php daemon tools",
     "type": "library",
     "authors": [
@@ -10,7 +10,10 @@
         }
     ],
     "minimum-stability": "stable",
-    "require": {},
+    "require": {
+        "ext-pcntl": "*",
+        "ext-posix": "*"
+    },
     "autoload": {
         "psr-4": {
             "zkc\\": "src/"
